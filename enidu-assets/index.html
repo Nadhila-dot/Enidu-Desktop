@@ -1,0 +1,1695 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Enidu Stress Test Client</title>
+  <style>
+    body {
+      font-family: monospace;
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 20px;
+    }
+    h1, h2, h3 {
+      border-bottom: 1px solid #000;
+      padding-bottom: 10px;
+    }
+    fieldset {
+      margin-bottom: 20px;
+      border: 1px solid #000;
+    }
+    label {
+      display: block;
+      margin: 10px 0 5px;
+    }
+    input, button {
+      font-family: monospace;
+      padding: 5px;
+    }
+    button {
+      cursor: pointer;
+      margin: 5px 0;
+    }
+    .log {
+      height: 200px;
+      overflow-y: auto;
+      border: 1px solid #000;
+      padding: 10px;
+      background-color: #f9f9f9;
+      white-space: pre-wrap;
+      font-size: 12px;
+      margin-bottom: 10px;
+    }
+    #activeJobs {
+      margin-top: 20px;
+      border: 1px solid #000;
+      padding: 10px;
+    }
+    .job {
+      padding: 5px;
+      margin-bottom: 5px;
+      border-bottom: 1px solid #ccc;
+      cursor: pointer;
+    }
+    .job:hover {
+      background-color: #eee;
+    }
+    .running {
+      border-left: 5px solid #000;
+      padding-left: 5px;
+    }
+    .stopping {
+      border-left: 5px solid #888;
+      padding-left: 5px;
+    }
+    .complete {
+      border-left: 5px solid #ccc;
+      padding-left: 5px;
+    }
+    #statusBar {
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      background: #000;
+      color: #fff;
+      padding: 5px 10px;
+      font-size: 12px;
+      z-index: 1000;
+    }
+    .instance-list {
+      max-height: 200px;
+      overflow-y: auto;
+      border: 1px solid #ccc;
+      padding: 10px;
+      margin-top: 10px;
+    }
+    .instance-item {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 5px;
+      border-bottom: 1px solid #eee;
+    }
+    .instance-item:hover {
+      background-color: #f9f9f9;
+    }
+    .instance-item button {
+      background: none;
+      border: none;
+      cursor: pointer;
+      padding: 0 5px;
+      font-size: 14px;
+    }
+    .tabs {
+      display: flex;
+      margin-bottom: 10px;
+    }
+    .tab {
+      padding: 5px 15px;
+      border: 1px solid #000;
+      border-bottom: none;
+      margin-right: 5px;
+      cursor: pointer;
+    }
+    .tab.active {
+      background-color: #000;
+      color: #fff;
+    }
+    .instance-actions {
+      display: flex;
+      gap: 5px;
+      align-items: center;
+    }
+    .batch-results {
+      margin-top: 10px;
+      padding: 10px;
+      border: 1px solid #ccc;
+      background-color: #f9f9f9;
+    }
+    .log-card {
+      border: 1px solid #000;
+      margin-bottom: 20px;
+      border-radius: 3px;
+      overflow: hidden;
+    }
+    .log-card-header {
+      background-color: #000;
+      color: #fff;
+      padding: 8px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .log-card-header h3 {
+      margin: 0;
+      padding: 0;
+      border: none;
+      font-size: 14px;
+    }
+    .log-cards-container {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(500px, 1fr));
+      gap: 20px;
+    }
+    .log-card-controls {
+      display: flex;
+      gap: 10px;
+    }
+    .log-card-controls button {
+      margin: 0;
+      padding: 2px 8px;
+      background-color: #333;
+      color: #fff;
+      border: none;
+      border-radius: 3px;
+    }
+    .log-stats {
+      display: flex;
+      gap: 15px;
+      background-color: #eee;
+      padding: 5px;
+      font-size: 12px;
+    }
+    .stat {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+    .stat-value {
+      font-weight: bold;
+    }
+    .stat-label {
+      font-size: 10px;
+      text-transform: uppercase;
+    }
+    .status-indicator {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      display: inline-block;
+      margin-right: 5px;
+    }
+    .status-online {
+      background-color: #0a0;
+    }
+    .status-offline {
+      background-color: #a00;
+    }
+    .status-unknown {
+      background-color: #aaa;
+    }
+    .empty-state {
+      text-align: center;
+      padding: 40px;
+      color: #666;
+      border: 2px dashed #ccc;
+      border-radius: 5px;
+      margin: 20px 0;
+    }
+    .error-message {
+      background-color: #fee;
+      border-left: 5px solid #c00;
+      padding: 10px;
+      margin: 10px 0;
+    }
+    /* New styles for stopping state */
+    .log-card.stopping {
+      border: 1px solid #f90;
+      box-shadow: 0 0 5px rgba(255, 153, 0, 0.5);
+    }
+    .log-card.stopping .log-card-header {
+      background-color: #f90;
+    }
+    .stopping-message {
+      background-color: #fff3cd;
+      color: #856404;
+      padding: 3px;
+      margin: 2px 0;
+      border-left: 3px solid #f90;
+      font-weight: bold;
+    }
+    .status-pill {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: 12px;
+      font-size: 11px;
+      font-weight: bold;
+      margin-left: 8px;
+    }
+    .status-pill.running {
+      background-color: #28a745;
+      color: white;
+    }
+    .status-pill.stopping {
+      background-color: #f90;
+      color: white;
+      animation: pulse 1.2s infinite;
+    }
+    .status-pill.complete {
+      background-color: #6c757d;
+      color: white;
+    }
+    .status-pill.error {
+      background-color: #dc3545;
+      color: white;
+    }
+    @keyframes pulse {
+      0% { opacity: 0.8; }
+      50% { opacity: 1; }
+      100% { opacity: 0.8; }
+    }
+    .job-status {
+      padding: 5px;
+      margin: 5px 0;
+      font-weight: bold;
+      border-radius: 3px;
+    }
+  </style>
+</head>
+<body>
+  <h1>Job Application </h1>
+  
+  <fieldset>
+    <legend>Instance Management</legend>
+    <label for="instanceUrl">Instance URL:</label>
+    <div style="display: flex; gap: 5px;">
+      <input type="url" id="instanceUrl" placeholder="http://localhost:3171" style="flex: 1;">
+      <button id="addInstance">Add Instance</button>
+      <button id="checkSelectedInstance">Check Status</button>
+    </div>
+    
+    <div class="instance-list" id="instancesList">
+      <div class="empty-state">No instances added</div>
+    </div>
+    
+    <div style="margin-top: 10px;">
+      <button id="checkAllInstances">Check All Instances</button>
+      <button id="clearInstances">Clear All Instances</button>
+    </div>
+  </fieldset>
+
+  <fieldset>
+    <legend>Test Configuration</legend>
+    <label for="targetUrl">Target URL:</label>
+    <input type="url" id="targetUrl" placeholder="https://example.com" style="width: 100%;">
+    
+    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+      <div>
+        <label for="concurrency">Concurrency:</label>
+        <input type="number" id="concurrency" value="100" min="1" max="10000" style="width: 90%;">
+      </div>
+      
+      <div>
+        <label for="timeoutSec">Timeout (seconds):</label>
+        <input type="number" id="timeoutSec" value="10" min="1" max="60" style="width: 90%;">
+      </div>
+      
+      <div>
+        <label for="waitMs">Wait (ms):</label>
+        <input type="number" id="waitMs" value="0" min="0" max="1000" style="width: 90%;">
+      </div>
+      
+      <div>
+        <label for="randomHeaders" style="display: flex; align-items: center;">
+          <input type="checkbox" id="randomHeaders"> 
+          <span style="margin-left: 5px;">Use random headers</span>
+        </label>
+      </div>
+    </div>
+    
+    <div style="display: flex; gap: 10px; margin-top: 15px;">
+      <div style="flex: 1;">
+        <button id="startSingleTest" style="width: 100%;">Start Test on Selected Instance</button>
+      </div>
+      <div style="flex: 1;">
+        <button id="startBatchTest" style="width: 100%;">Start Test on All Instances</button>
+      </div>
+    </div>
+    
+    <div style="display: flex; gap: 10px; margin-top: 5px;">
+      <div style="flex: 1;">
+        <button id="stopAllTests" style="width: 100%;">Stop All Tests</button>
+      </div>
+      <div style="flex: 1;">
+        <button id="clearLogs" style="width: 100%;">Clear All Logs</button>
+      </div>
+    </div>
+  </fieldset>
+
+  <div class="tabs">
+    <div class="tab active" data-tab="logs">Live Logs</div>
+    <div class="tab" data-tab="jobs">Active Jobs</div>
+    <div class="tab" data-tab="batch">Batch Results</div>
+  </div>
+
+  <div id="logsTab" class="tab-content">
+    <h2>Live Test Output</h2>
+    <div id="logCards" class="log-cards-container">
+      <div class="empty-state">No active log streams</div>
+    </div>
+  </div>
+  
+  <div id="jobsTab" class="tab-content" style="display: none;">
+    <h2>Active Jobs</h2>
+    <div id="activeJobs">No active jobs</div>
+  </div>
+  
+  <div id="batchTab" class="tab-content" style="display: none;">
+    <h2>Batch Test Results</h2>
+    <div id="batchResults">No batch tests run yet</div>
+  </div>
+
+  <div id="statusBar">Not connected</div>
+
+  <script>
+    // DOM Elements
+    const instanceUrlEl = document.getElementById('instanceUrl');
+    const addInstanceBtn = document.getElementById('addInstance');
+    const checkSelectedInstanceBtn = document.getElementById('checkSelectedInstance');
+    const checkAllInstancesBtn = document.getElementById('checkAllInstances');
+    const clearInstancesBtn = document.getElementById('clearInstances');
+    const instancesListEl = document.getElementById('instancesList');
+    const targetUrlEl = document.getElementById('targetUrl');
+    const concurrencyEl = document.getElementById('concurrency');
+    const timeoutSecEl = document.getElementById('timeoutSec');
+    const waitMsEl = document.getElementById('waitMs');
+    const randomHeadersEl = document.getElementById('randomHeaders');
+    const startSingleTestBtn = document.getElementById('startSingleTest');
+    const startBatchTestBtn = document.getElementById('startBatchTest');
+    const stopAllTestsBtn = document.getElementById('stopAllTests');
+    const clearLogsBtn = document.getElementById('clearLogs');
+    const logCardsEl = document.getElementById('logCards');
+    const activeJobsEl = document.getElementById('activeJobs');
+    const batchResultsEl = document.getElementById('batchResults');
+    const statusBarEl = document.getElementById('statusBar');
+    const tabs = document.querySelectorAll('.tab');
+    const tabContents = document.querySelectorAll('.tab-content');
+
+    // State
+    let activeSockets = {}; // Map of jobId -> WebSocket
+    let jobLogs = {}; // Map of jobId -> log content
+    let jobStats = {}; // Map of jobId -> stats
+    let jobRefreshInterval = null;
+    let instances = [];
+    let selectedInstanceIndex = -1;
+    let batchResults = [];
+
+    // Load instances from localStorage
+    function loadInstances() {
+      const savedInstances = localStorage.getItem('enidu_instances');
+      if (savedInstances) {
+        instances = JSON.parse(savedInstances);
+        renderInstances();
+      }
+    }
+
+    // Save instances to localStorage
+    function saveInstances() {
+      localStorage.setItem('enidu_instances', JSON.stringify(instances));
+    }
+
+    // Render instances list
+    function renderInstances() {
+      if (instances.length === 0) {
+        instancesListEl.innerHTML = '<div class="empty-state">No instances added</div>';
+        return;
+      }
+
+      instancesListEl.innerHTML = '';
+      instances.forEach((instance, index) => {
+        const div = document.createElement('div');
+        div.className = 'instance-item';
+        if (index === selectedInstanceIndex) {
+          div.style.backgroundColor = '#f0f0f0';
+          div.style.fontWeight = 'bold';
+        }
+
+        const statusIndicator = document.createElement('span');
+        statusIndicator.className = 'status-indicator status-' + instance.status;
+        
+        const urlSpan = document.createElement('span');
+        urlSpan.textContent = instance.url;
+        urlSpan.style.flex = '1';
+        urlSpan.style.overflow = 'hidden';
+        urlSpan.style.textOverflow = 'ellipsis';
+        urlSpan.style.whiteSpace = 'nowrap';
+        
+        const actionsDiv = document.createElement('div');
+        actionsDiv.className = 'instance-actions';
+
+        const selectBtn = document.createElement('button');
+        selectBtn.textContent = '✓';
+        selectBtn.title = 'Select this instance';
+        selectBtn.onclick = (e) => {
+          e.stopPropagation();
+          selectInstance(index);
+        };
+
+        const removeBtn = document.createElement('button');
+        removeBtn.textContent = '✕';
+        removeBtn.title = 'Remove this instance';
+        removeBtn.onclick = (e) => {
+          e.stopPropagation();
+          removeInstance(index);
+        };
+
+        actionsDiv.appendChild(selectBtn);
+        actionsDiv.appendChild(removeBtn);
+        
+        div.appendChild(statusIndicator);
+        div.appendChild(urlSpan);
+        div.appendChild(actionsDiv);
+        
+        div.addEventListener('click', () => {
+          selectInstance(index);
+        });
+        
+        instancesListEl.appendChild(div);
+      });
+    }
+
+    // Add instance
+    addInstanceBtn.addEventListener('click', () => {
+      const url = instanceUrlEl.value.trim();
+      if (!url) {
+        updateStatus('Error: Instance URL is required');
+        return;
+      }
+      
+      // Check if this instance already exists
+      if (instances.some(inst => inst.url === url)) {
+        updateStatus('Error: This instance is already in the list');
+        return;
+      }
+      
+      instances.push({
+        url,
+        status: 'unknown'
+      });
+      
+      saveInstances();
+      renderInstances();
+      
+      // Select the newly added instance
+      selectInstance(instances.length - 1);
+      
+      updateStatus(`Added instance: ${url}`);
+      instanceUrlEl.value = '';
+    });
+
+    // Select instance
+    function selectInstance(index) {
+      selectedInstanceIndex = index;
+      renderInstances();
+      
+      const instance = instances[index];
+      updateStatus(`Selected instance: ${instance.url}`);
+      
+      // Check status of this instance
+      checkInstanceStatus(instance.url);
+    }
+
+    // Remove instance
+    function removeInstance(index) {
+      const removedInstance = instances[index];
+      instances.splice(index, 1);
+      
+      if (selectedInstanceIndex === index) {
+        selectedInstanceIndex = instances.length > 0 ? 0 : -1;
+      } else if (selectedInstanceIndex > index) {
+        selectedInstanceIndex--;
+      }
+      
+      saveInstances();
+      renderInstances();
+      updateStatus(`Removed instance: ${removedInstance.url}`);
+    }
+
+    // Check selected instance status
+    checkSelectedInstanceBtn.addEventListener('click', () => {
+      if (selectedInstanceIndex === -1) {
+        updateStatus('Error: No instance selected');
+        return;
+      }
+      
+      checkInstanceStatus(instances[selectedInstanceIndex].url);
+    });
+
+    // Check all instances status
+    checkAllInstancesBtn.addEventListener('click', async () => {
+      if (instances.length === 0) {
+        updateStatus('No instances to check');
+        return;
+      }
+      
+      updateStatus('Checking all instances...');
+      
+      // Use Promise.all for parallel requests
+      const checkPromises = instances.map(async (instance, idx) => {
+        try {
+          const response = await fetch(`${instance.url}/api/v1/`, {
+            method: 'GET',
+            headers: { 'Accept': 'application/json' },
+            // Set a reasonable timeout
+            signal: AbortSignal.timeout(5000)
+          });
+          
+          if (!response.ok) {
+            throw new Error(`HTTP error: ${response.status}`);
+          }
+          
+          const data = await response.json();
+          return {
+            index: idx,
+            status: 'online',
+            version: data.version || 'unknown',
+            message: data.message || 'OK'
+          };
+        } catch (error) {
+          return {
+            index: idx,
+            status: 'offline',
+            error: error.message
+          };
+        }
+      });
+      
+      const results = await Promise.all(checkPromises);
+      
+      // Update the instances with the results
+      results.forEach(result => {
+        const instance = instances[result.index];
+        instance.status = result.status;
+        if (result.status === 'online') {
+          instance.version = result.version;
+          updateStatus(`Instance ${instance.url}: ${result.message} (${result.version})`);
+        } else {
+          updateStatus(`Instance ${instance.url}: Offline - ${result.error}`);
+        }
+      });
+      
+      saveInstances();
+      renderInstances();
+      
+      // Count online/offline instances
+      const onlineCount = results.filter(r => r.status === 'online').length;
+      updateStatus(`Checked ${instances.length} instances: ${onlineCount} online, ${instances.length - onlineCount} offline`);
+    });
+
+    // Clear all instances
+    clearInstancesBtn.addEventListener('click', () => {
+      if (confirm('Are you sure you want to remove all instances?')) {
+        instances = [];
+        selectedInstanceIndex = -1;
+        saveInstances();
+        renderInstances();
+        updateStatus('All instances removed');
+      }
+    });
+
+    // Check instance status
+    async function checkInstanceStatus(instanceUrl) {
+      if (!instanceUrl) return;
+
+      try {
+        updateStatus(`Checking instance status: ${instanceUrl}...`);
+        const response = await fetch(`${instanceUrl}/api/v1/`, {
+          method: 'GET',
+          headers: { 'Accept': 'application/json' },
+          signal: AbortSignal.timeout(5000)
+        });
+        
+        if (!response.ok) {
+          throw new Error(`HTTP error: ${response.status}`);
+        }
+        
+        const data = await response.json();
+        
+        // Update instance status in our list
+        const index = instances.findIndex(inst => inst.url === instanceUrl);
+        if (index !== -1) {
+          instances[index].status = 'online';
+          instances[index].version = data.version || 'unknown';
+          saveInstances();
+          renderInstances();
+        }
+        
+        updateStatus(`Instance ${instanceUrl}: ${data.message} (${data.version || 'unknown'})`);
+        
+        // Fetch jobs for this instance
+        fetchJobs(instanceUrl);
+        
+        return true;
+      } catch (error) {
+        updateStatus(`Error connecting to instance ${instanceUrl}: ${error.message}`);
+        
+        // Update instance status in our list
+        const index = instances.findIndex(inst => inst.url === instanceUrl);
+        if (index !== -1) {
+          instances[index].status = 'offline';
+          saveInstances();
+          renderInstances();
+        }
+        
+        return false;
+      }
+    }
+
+    // Start test on selected instance
+    startSingleTestBtn.addEventListener('click', async () => {
+      if (selectedInstanceIndex === -1) {
+        updateStatus('Error: No instance selected');
+        return;
+      }
+      
+      const instanceUrl = instances[selectedInstanceIndex].url;
+      await startTest(instanceUrl);
+    });
+
+    // Start batch test on all instances
+    startBatchTestBtn.addEventListener('click', async () => {
+      if (instances.length === 0) {
+        updateStatus('Error: No instances added');
+        return;
+      }
+      
+      const targetUrl = targetUrlEl.value;
+      if (!targetUrl) {
+        updateStatus('Error: Target URL is required');
+        return;
+      }
+      
+      // Clear previous batch results
+      batchResults = [];
+      batchResultsEl.innerHTML = '<div>Starting batch test...</div>';
+      
+      // Switch to batch tab
+      switchTab('logs');
+      
+      updateStatus(`Starting batch test on ${instances.length} instances...`);
+      
+      // Perform a quick status check on all instances first
+      await checkAllInstances();
+      
+      // Filter only online instances
+      const onlineInstances = instances.filter(instance => instance.status === 'online');
+      
+      if (onlineInstances.length === 0) {
+        updateStatus('Error: No online instances available to run tests');
+        batchResultsEl.innerHTML = '<div class="error-message">No online instances available to run tests</div>';
+        return;
+      }
+      
+      updateStatus(`Found ${onlineInstances.length} online instances, starting tests...`);
+      
+      // Prepare batch test config
+      const testConfig = {
+        url: targetUrl,
+        concurrency: parseInt(concurrencyEl.value),
+        timeoutSec: parseInt(timeoutSecEl.value),
+        waitMs: parseInt(waitMsEl.value),
+        randomHeaders: randomHeadersEl.checked
+      };
+      
+      // Start test on all online instances with retry mechanism
+      for (const instance of onlineInstances) {
+        try {
+          // Try to start the test with retry
+          let retryCount = 0;
+          let success = false;
+          let result = null;
+          
+          while (retryCount < 3 && !success) {
+            try {
+              updateStatus(`Starting test on ${instance.url} (attempt ${retryCount + 1})...`);
+              result = await startTestWithTimeout(instance.url, testConfig, 8000);
+              success = true;
+            } catch (error) {
+              retryCount++;
+              if (retryCount < 3) {
+                updateStatus(`Retrying ${instance.url} after error: ${error.message}`);
+                await new Promise(resolve => setTimeout(resolve, 1000)); // Wait 1s before retry
+              } else {
+                updateStatus(`Failed to start test on ${instance.url} after ${retryCount} attempts: ${error.message}`);
+                // Record the failure in batch results
+                batchResults.push({
+                  instanceUrl: instance.url,
+                  success: false,
+                  error: `Failed after ${retryCount} attempts: ${error.message}`
+                });
+              }
+            }
+          }
+          
+          if (success && result) {
+            batchResults.push({
+              instanceUrl: instance.url,
+              success: true,
+              jobId: result.id,
+              wsUrl: result.wsUrl
+            });
+            
+            // Connect WebSocket for this job
+            connectToWebSocket(instance.url, result.wsUrl, result.id);
+          }
+        } catch (error) {
+          updateStatus(`Error starting test on ${instance.url}: ${error.message}`);
+          batchResults.push({
+            instanceUrl: instance.url,
+            success: false,
+            error: error.message
+          });
+        }
+      }
+      
+      // Display batch results
+      renderBatchResults();
+      
+      // Set success count
+      const successCount = batchResults.filter(r => r.success).length;
+      updateStatus(`Batch test started on ${successCount}/${onlineInstances.length} instances`);
+    });
+
+    // Check all instances at once
+    async function checkAllInstances() {
+      const checkPromises = instances.map(async (instance, idx) => {
+        try {
+          const response = await fetch(`${instance.url}/api/v1/`, {
+            signal: AbortSignal.timeout(5000)
+          });
+          
+          if (!response.ok) {
+            throw new Error(`HTTP ${response.status}`);
+          }
+          
+          const data = await response.json();
+          instance.status = 'online';
+          instance.version = data.version || 'unknown';
+          return true;
+        } catch (error) {
+          instance.status = 'offline';
+          return false;
+        }
+      });
+      
+      await Promise.all(checkPromises);
+      saveInstances();
+      renderInstances();
+    }
+
+    // Start test with timeout protection
+    async function startTestWithTimeout(instanceUrl, config, timeoutMs) {
+      return new Promise(async (resolve, reject) => {
+        // Set timeout
+        const timeoutId = setTimeout(() => {
+          reject(new Error("Request timed out"));
+        }, timeoutMs);
+        
+        try {
+          // Make the API request
+          const response = await fetch(`${instanceUrl}/api/v1/jobs`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(config)
+          });
+          
+          clearTimeout(timeoutId);
+          
+          if (!response.ok) {
+            throw new Error(`HTTP error: ${response.status}`);
+          }
+          
+          const data = await response.json();
+          resolve(data);
+        } catch (error) {
+          clearTimeout(timeoutId);
+          reject(error);
+        }
+      });
+    }
+
+    // Start test on a specific instance
+    async function startTest(instanceUrl) {
+      if (!instanceUrl) return;
+      
+      const targetUrl = targetUrlEl.value;
+      if (!targetUrl) {
+        updateStatus('Error: Target URL is required');
+        return;
+      }
+      
+      try {
+        updateStatus(`Starting test on ${instanceUrl}...`);
+        
+        // Switch to logs tab
+        switchTab('logs');
+        
+        const config = {
+          url: targetUrl,
+          concurrency: parseInt(concurrencyEl.value),
+          timeoutSec: parseInt(timeoutSecEl.value),
+          waitMs: parseInt(waitMsEl.value),
+          randomHeaders: randomHeadersEl.checked
+        };
+        
+        const data = await startTestWithTimeout(instanceUrl, config, 10000);
+        updateStatus(`Test started with job ID: ${data.id} on ${instanceUrl}`);
+        
+        // Connect to WebSocket
+        connectToWebSocket(instanceUrl, data.wsUrl, data.id);
+        
+        // Refresh job list
+        fetchJobs(instanceUrl);
+        
+        return data;
+      } catch (error) {
+        updateStatus(`Error starting test on ${instanceUrl}: ${error.message}`);
+        return null;
+      }
+    }
+
+    // Stop all tests on all instances
+    stopAllTestsBtn.addEventListener('click', async () => {
+      if (instances.length === 0) {
+        updateStatus('No instances to stop tests on');
+        return;
+      }
+      
+      updateStatus('Stopping all tests on all instances...');
+      
+      const stopPromises = instances.map(async (instance) => {
+        try {
+          const response = await fetch(`${instance.url}/api/v1/jobs`, {
+            method: 'DELETE',
+            signal: AbortSignal.timeout(5000)
+          });
+          
+          const data = await response.json();
+          return {
+            instanceUrl: instance.url,
+            success: true,
+            count: data.count || 0
+          };
+        } catch (error) {
+          return {
+            instanceUrl: instance.url,
+            success: false,
+            error: error.message
+          };
+        }
+      });
+      
+      const results = await Promise.all(stopPromises);
+      
+      // Count total stopped jobs
+      let totalStopped = 0;
+      let successfulInstances = 0;
+      
+      results.forEach(result => {
+        if (result.success) {
+          totalStopped += result.count;
+          successfulInstances++;
+        }
+      });
+      
+      // Update all jobs to stopping state
+      Object.keys(jobStats).forEach(jobId => {
+        if (!jobStats[jobId].status || jobStats[jobId].status === 'running') {
+          jobStats[jobId].status = 'stopping';
+        }
+      });
+      
+      // Update UI
+      renderLogCards();
+      
+      // Close all websockets after a delay to allow for log messages to arrive
+      setTimeout(() => {
+        Object.keys(activeSockets).forEach(jobId => {
+          if (activeSockets[jobId] && activeSockets[jobId].readyState === WebSocket.OPEN) {
+            activeSockets[jobId].close();
+          }
+        });
+      }, 2000);
+      
+      updateStatus(`Stopped ${totalStopped} test(s) on ${successfulInstances}/${instances.length} instances`);
+      
+      // Refresh jobs on all instances
+      for (const instance of instances.filter(i => i.status === 'online')) {
+        try {
+          await fetchJobs(instance.url);
+        } catch (error) {
+          console.error(`Error fetching jobs for ${instance.url}:`, error);
+        }
+      }
+    });
+    
+    // Clear all logs
+    clearLogsBtn.addEventListener('click', () => {
+      // Close all websockets
+      Object.keys(activeSockets).forEach(jobId => {
+        if (activeSockets[jobId] && activeSockets[jobId].readyState === WebSocket.OPEN) {
+          activeSockets[jobId].close();
+        }
+      });
+      
+      // Clear logs and sockets
+      activeSockets = {};
+      jobLogs = {};
+      jobStats = {};
+      
+      // Update UI
+      renderLogCards();
+      
+      updateStatus('All logs cleared');
+    });
+
+    // Connect to WebSocket with improved handling of SERVICE STOPPING messages
+    function connectToWebSocket(instanceUrl, wsUrl, jobId) {
+      // Close existing socket for this job if any
+      if (activeSockets[jobId] && activeSockets[jobId].readyState === WebSocket.OPEN) {
+        activeSockets[jobId].close();
+      }
+      
+      // Create WebSocket URL - handle both absolute and relative paths
+      let fullWsUrl;
+      if (wsUrl.startsWith('ws://') || wsUrl.startsWith('wss://')) {
+        fullWsUrl = wsUrl;
+      } else {
+        // Convert http:// to ws:// or https:// to wss://
+        const wsProtocol = instanceUrl.startsWith('https') ? 'wss://' : 'ws://';
+        const urlWithoutProtocol = instanceUrl.replace(/^https?:\/\//, '');
+        fullWsUrl = wsProtocol + urlWithoutProtocol + wsUrl;
+      }
+      
+      updateStatus(`Connecting to WebSocket: ${fullWsUrl}`);
+      
+      // Initialize log for this job
+      if (!jobLogs[jobId]) {
+        jobLogs[jobId] = {
+          instanceUrl,
+          logs: 'Connecting to WebSocket...\n',
+          lastUpdated: new Date()
+        };
+      }
+      
+      // Initialize job stats if not exists
+      if (!jobStats[jobId]) {
+        jobStats[jobId] = {
+          status: 'running',
+          lastUpdated: new Date()
+        };
+      }
+      
+      // Create new WebSocket
+      const socket = new WebSocket(fullWsUrl);
+      activeSockets[jobId] = socket;
+      
+      socket.onopen = () => {
+        updateStatus(`WebSocket connected for job: ${jobId}`);
+        addToJobLog(jobId, 'WebSocket connected, waiting for data...\n');
+        renderLogCards();
+      };
+      
+      socket.onmessage = (event) => {
+        try {
+          const message = JSON.parse(event.data);
+          
+          // Handle different message types
+          if (message.type === 'status') {
+            // Explicit status message
+            updateJobStatus(jobId, message.data);
+            addToJobLog(jobId, `\n⚠️ JOB STATUS CHANGED: ${message.data}\n`);
+          } 
+          else if (message.type === 'info') {
+            // Store job info in stats
+            jobStats[jobId] = { 
+              ...jobStats[jobId], 
+              ...message.data,
+              lastUpdated: new Date()
+            };
+            addToJobLog(jobId, `Job Info: ${JSON.stringify(message.data, null, 2)}\n`);
+          } 
+          else if (message.type === 'log') {
+            // Check for SERVICE STOPPING in log message
+            if (typeof message.data === 'string' && message.data.includes('SERVICE STOPPING')) {
+              updateJobStatus(jobId, 'stopping');
+              addToJobLog(jobId, `\n⚠️ ${message.data}\n`);
+            } else {
+              addToJobLog(jobId, `${message.data}`);
+            }
+            
+            // Try to parse stats from log line
+            if (typeof message.data === 'string') {
+              parseStatsFromLog(jobId, message.data);
+            }
+          } 
+          else if (message.log) {
+            // Legacy format - Check for SERVICE STOPPING in log
+            if (message.log.includes('SERVICE STOPPING')) {
+              updateJobStatus(jobId, 'stopping');
+              addToJobLog(jobId, `\n⚠️ ${message.log}\n`);
+            } else {
+              addToJobLog(jobId, `${message.log}\n`);
+            }
+            
+            parseStatsFromLog(jobId, message.log);
+          }
+          
+          renderLogCards();
+        } catch (error) {
+          // Handle non-JSON messages
+          console.error('Error parsing WebSocket message:', error);
+          
+          // Check if the raw message contains SERVICE STOPPING
+          if (typeof event.data === 'string') {
+            if (event.data.includes('SERVICE STOPPING')) {
+              updateJobStatus(jobId, 'stopping');
+              addToJobLog(jobId, `\n⚠️ ${event.data}\n`);
+            } else {
+              addToJobLog(jobId, `${event.data}\n`);
+            }
+          } else {
+            addToJobLog(jobId, 'Received non-text message\n');
+          }
+          
+          renderLogCards();
+        }
+      };
+      
+      socket.onclose = () => {
+        updateStatus(`WebSocket disconnected for job: ${jobId}`);
+        addToJobLog(jobId, '\nWebSocket connection closed\n');
+        delete activeSockets[jobId];
+        
+        renderLogCards();
+        
+        // Check job status
+        fetchJobStatus(instanceUrl, jobId);
+      };
+      
+      socket.onerror = (error) => {
+        updateStatus(`WebSocket error for job: ${jobId}`);
+        addToJobLog(jobId, `\nWebSocket error: ${error}\n`);
+        
+        renderLogCards();
+      };
+      
+      // Render log cards to show the new connection
+      renderLogCards();
+    }
+    
+    // Update job status and track in state
+    function updateJobStatus(jobId, status) {
+      if (!jobStats[jobId]) {
+        jobStats[jobId] = { lastUpdated: new Date() };
+      }
+      
+      const prevStatus = jobStats[jobId].status;
+      jobStats[jobId].status = status;
+      jobStats[jobId].lastUpdated = new Date();
+      
+      // Log status change if different
+      if (prevStatus !== status) {
+        updateStatus(`Job ${jobId} status changed: ${prevStatus || 'unknown'} → ${status}`);
+      }
+      
+      // Update UI
+      renderLogCards();
+    }
+    
+    // Add log entry to job logs
+    function addToJobLog(jobId, logEntry) {
+      if (!jobLogs[jobId]) {
+        jobLogs[jobId] = { logs: '', lastUpdated: new Date() };
+      }
+      
+      jobLogs[jobId].logs += logEntry;
+      jobLogs[jobId].lastUpdated = new Date();
+      
+      // Keep logs under a reasonable size
+      const maxLogSize = 50000;
+      if (jobLogs[jobId].logs.length > maxLogSize) {
+        jobLogs[jobId].logs = jobLogs[jobId].logs.substring(
+          jobLogs[jobId].logs.length - maxLogSize
+        );
+      }
+    }
+    
+    // Parse stats from log line
+    function parseStatsFromLog(jobId, logLine) {
+      // Simple regex to extract stats from a typical load test output line
+      // Adapt this pattern to match your actual log format
+      const rpsMatch = logLine.match(/RPS: (\d+)/);
+      const sentMatch = logLine.match(/Reqs: (\d+)/);
+      const successMatch = logLine.match(/Success: (\d+)/);
+      const errorsMatch = logLine.match(/Errors: (\d+)/);
+      const timeoutsMatch = logLine.match(/Timeouts: (\d+)/);
+      const connErrorsMatch = logLine.match(/ConnErrs: (\d+)/);
+      
+      if (sentMatch || rpsMatch || successMatch || errorsMatch) {
+        if (!jobStats[jobId]) {
+          jobStats[jobId] = {};
+        }
+        
+        if (rpsMatch) jobStats[jobId].rps = parseInt(rpsMatch[1]);
+        if (sentMatch) jobStats[jobId].sent = parseInt(sentMatch[1]);
+        if (successMatch) jobStats[jobId].success = parseInt(successMatch[1]);
+        if (errorsMatch) jobStats[jobId].errors = parseInt(errorsMatch[1]);
+        if (timeoutsMatch) jobStats[jobId].timeouts = parseInt(timeoutsMatch[1]);
+        if (connErrorsMatch) jobStats[jobId].connErrors = parseInt(connErrorsMatch[1]);
+        
+        jobStats[jobId].lastUpdated = new Date();
+      }
+    }
+
+    // Format log content to highlight special messages
+    function formatLogContent(logs) {
+      return logs.split('\n').map(line => {
+        if (line.includes('SERVICE STOPPING')) {
+          return `<div class="stopping-message">${escapeHtml(line)}</div>`;
+        } else if (line.includes('⚠️')) {
+          return `<div style="color:#d73a49;font-weight:bold">${escapeHtml(line)}</div>`;
+        } else if (line.includes('ERROR:')) {
+          return `<div style="color:#d73a49">${escapeHtml(line)}</div>`;
+        }
+        return escapeHtml(line);
+      }).join('\n');
+    }
+    
+    // Helper function to escape HTML in log messages
+    function escapeHtml(unsafe) {
+      return unsafe
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#039;");
+    }
+
+    // Render log cards for all active jobs with enhanced visualization
+    function renderLogCards() {
+      // Get all job IDs from both active sockets and job logs
+      const allJobIds = new Set([
+        ...Object.keys(activeSockets),
+        ...Object.keys(jobLogs)
+      ]);
+      
+      if (allJobIds.size === 0) {
+        logCardsEl.innerHTML = '<div class="empty-state">No active log streams</div>';
+        return;
+      }
+      
+      // Sort jobs - active first, then by last updated timestamp
+      const sortedJobs = Array.from(allJobIds).sort((a, b) => {
+        const aActive = activeSockets[a] && activeSockets[a].readyState === WebSocket.OPEN;
+        const bActive = activeSockets[b] && activeSockets[b].readyState === WebSocket.OPEN;
+        
+        if (aActive && !bActive) return -1;
+        if (!aActive && bActive) return 1;
+        
+        const aTime = jobLogs[a]?.lastUpdated || new Date(0);
+        const bTime = jobLogs[b]?.lastUpdated || new Date(0);
+        return bTime - aTime;
+      });
+      
+      logCardsEl.innerHTML = '';
+      
+      sortedJobs.forEach(jobId => {
+        const isActive = activeSockets[jobId] && activeSockets[jobId].readyState === WebSocket.OPEN;
+        const logs = jobLogs[jobId]?.logs || '';
+        const stats = jobStats[jobId] || {};
+        const instanceUrl = jobLogs[jobId]?.instanceUrl || '';
+        const jobStatus = stats.status || (isActive ? 'running' : 'closed');
+        
+        const card = document.createElement('div');
+        card.className = 'log-card';
+        
+        // Add status-specific class
+        if (jobStatus === 'stopping') {
+          card.classList.add('stopping');
+        }
+        
+        // Card header
+        const header = document.createElement('div');
+        header.className = 'log-card-header';
+        
+        const title = document.createElement('h3');
+        const statusPill = document.createElement('span');
+        statusPill.className = `status-pill ${jobStatus}`;
+        
+        if (jobStatus === 'running') {
+          statusPill.textContent = 'RUNNING';
+          title.textContent = `Job: ${jobId}`;
+        } else if (jobStatus === 'stopping') {
+          statusPill.textContent = 'STOPPING';
+          title.textContent = `Job: ${jobId}`;
+        } else if (jobStatus === 'complete') {
+          statusPill.textContent = 'COMPLETE';
+          title.textContent = `Job: ${jobId}`;
+        } else if (jobStatus === 'error') {
+          statusPill.textContent = 'ERROR';
+          title.textContent = `Job: ${jobId}`;
+        } else {
+          title.textContent = `Job: ${jobId} ${isActive ? '(LIVE)' : '(CLOSED)'}`;
+        }
+        
+        title.appendChild(statusPill);
+        
+        const controls = document.createElement('div');
+        controls.className = 'log-card-controls';
+        
+        // Only show stop button if job is active and not already stopping
+        if (isActive && jobStatus !== 'stopping') {
+          const stopBtn = document.createElement('button');
+          stopBtn.textContent = 'Stop';
+          stopBtn.onclick = () => stopJob(instanceUrl, jobId);
+          controls.appendChild(stopBtn);
+        }
+        
+        const closeBtn = document.createElement('button');
+        closeBtn.textContent = 'Close';
+        closeBtn.onclick = () => {
+          if (isActive && activeSockets[jobId]) {
+            activeSockets[jobId].close();
+          }
+          delete jobLogs[jobId];
+          delete jobStats[jobId];
+          renderLogCards();
+        };
+        controls.appendChild(closeBtn);
+        
+        header.appendChild(title);
+        header.appendChild(controls);
+        card.appendChild(header);
+        
+        // Card info
+        if (instanceUrl) {
+          const info = document.createElement('div');
+          info.style.padding = '5px';
+          info.style.borderBottom = '1px solid #ccc';
+          info.style.fontSize = '12px';
+          info.innerHTML = `<strong>Instance:</strong> ${instanceUrl}`;
+          card.appendChild(info);
+        }
+        
+        // Status indicator
+        if (jobStatus === 'stopping') {
+          const statusIndicator = document.createElement('div');
+          statusIndicator.className = 'job-status';
+          statusIndicator.style.backgroundColor = '#fff3cd';
+          statusIndicator.style.color = '#856404';
+          statusIndicator.style.borderLeft = '3px solid #f90';
+          statusIndicator.textContent = '⚠️ Job is stopping - Shutdown in progress...';
+          card.appendChild(statusIndicator);
+        } else if (jobStatus === 'error') {
+          const statusIndicator = document.createElement('div');
+          statusIndicator.className = 'job-status';
+          statusIndicator.style.backgroundColor = '#f8d7da';
+          statusIndicator.style.color = '#721c24';
+          statusIndicator.style.borderLeft = '3px solid #dc3545';
+          statusIndicator.textContent = '❌ Job terminated with errors';
+          card.appendChild(statusIndicator);
+        } else if (jobStatus === 'complete') {
+          const statusIndicator = document.createElement('div');
+          statusIndicator.className = 'job-status';
+          statusIndicator.style.backgroundColor = '#d4edda';
+          statusIndicator.style.color = '#155724';
+          statusIndicator.style.borderLeft = '3px solid #28a745';
+          statusIndicator.textContent = '✅ Job completed successfully';
+          card.appendChild(statusIndicator);
+        }
+        
+        // Card stats
+        if (Object.keys(stats).length > 0) {
+          const statsDiv = document.createElement('div');
+          statsDiv.className = 'log-stats';
+          
+          if (stats.sent !== undefined) {
+            const sentStat = document.createElement('div');
+            sentStat.className = 'stat';
+            sentStat.innerHTML = `<span class="stat-value">${stats.sent}</span><span class="stat-label">Sent</span>`;
+            statsDiv.appendChild(sentStat);
+          }
+          
+          if (stats.success !== undefined) {
+            const successStat = document.createElement('div');
+            successStat.className = 'stat';
+            successStat.innerHTML = `<span class="stat-value">${stats.success}</span><span class="stat-label">Success</span>`;
+            statsDiv.appendChild(successStat);
+          }
+          
+          if (stats.errors !== undefined) {
+            const errorsStat = document.createElement('div');
+            errorsStat.className = 'stat';
+            errorsStat.innerHTML = `<span class="stat-value">${stats.errors}</span><span class="stat-label">Errors</span>`;
+            statsDiv.appendChild(errorsStat);
+          }
+          
+          if (stats.rps !== undefined) {
+            const rpsStat = document.createElement('div');
+            rpsStat.className = 'stat';
+            rpsStat.innerHTML = `<span class="stat-value">${stats.rps}</span><span class="stat-label">RPS</span>`;
+            statsDiv.appendChild(rpsStat);
+          }
+          
+          if (stats.timeouts !== undefined) {
+            const timeoutsStat = document.createElement('div');
+            timeoutsStat.className = 'stat';
+            timeoutsStat.innerHTML = `<span class="stat-value">${stats.timeouts}</span><span class="stat-label">Timeouts</span>`;
+            statsDiv.appendChild(timeoutsStat);
+          }
+          
+          if (stats.connErrors !== undefined) {
+            const connErrorsStat = document.createElement('div');
+            connErrorsStat.className = 'stat';
+            connErrorsStat.innerHTML = `<span class="stat-value">${stats.connErrors}</span><span class="stat-label">Conn Errors</span>`;
+            statsDiv.appendChild(connErrorsStat);
+          }
+          
+          card.appendChild(statsDiv);
+        }
+        
+        // Card logs with formatted content
+        const logsDiv = document.createElement('div');
+        logsDiv.className = 'log';
+        logsDiv.innerHTML = formatLogContent(logs);
+        logsDiv.scrollTop = logsDiv.scrollHeight; // Auto-scroll to bottom
+        card.appendChild(logsDiv);
+        
+        logCardsEl.appendChild(card);
+      });
+    }
+
+    // Fetch all jobs for an instance
+    async function fetchJobs(instanceUrl) {
+      if (!instanceUrl) return;
+      
+      try {
+        const response = await fetch(`${instanceUrl}/api/v1/jobs`, {
+          signal: AbortSignal.timeout(5000)
+        });
+        
+        if (!response.ok) {
+          throw new Error(`HTTP error: ${response.status}`);
+        }
+        
+        const data = await response.json();
+        
+        if (data.jobs && data.jobs.length > 0) {
+          activeJobsEl.innerHTML = `<div style="margin-bottom: 10px;"><strong>Instance:</strong> ${instanceUrl}</div>`;
+          
+          data.jobs.forEach(job => {
+            const jobEl = document.createElement('div');
+            jobEl.className = `job ${job.status}`;
+            
+            const statsText = job.stats ? 
+              `| Sent: ${job.stats.sent} | Success: ${job.stats.success} | Errors: ${job.stats.errors}` :
+              '';
+            
+            jobEl.innerHTML = `
+              <strong>${job.id}</strong> - ${job.url} 
+              (${job.concurrency} conn, ${job.status}) ${statsText}
+            `;
+            
+            jobEl.addEventListener('click', () => {
+              // Connect to WebSocket for this job if not already connected
+              if (!activeSockets[job.id]) {
+                const wsUrl = `/api/v1/ws/${job.id}`;
+                connectToWebSocket(instanceUrl, wsUrl, job.id);
+                switchTab('logs');
+              }
+              
+              updateStatus(`Selected job: ${job.id} on ${instanceUrl}`);
+            });
+            
+            activeJobsEl.appendChild(jobEl);
+          });
+        } else {
+          activeJobsEl.innerHTML = `
+            <div style="margin-bottom: 10px;"><strong>Instance:</strong> ${instanceUrl}</div>
+            <div>No active jobs on this instance</div>
+          `;
+        }
+      } catch (error) {
+        updateStatus(`Error fetching jobs from ${instanceUrl}: ${error.message}`);
+        activeJobsEl.innerHTML = `
+          <div style="margin-bottom: 10px;"><strong>Instance:</strong> ${instanceUrl}</div>
+          <div>Error fetching jobs: ${error.message}</div>
+        `;
+      }
+    }
+
+    // Fetch job status with better handling of SERVICE STOPPING state
+    async function fetchJobStatus(instanceUrl, jobId) {
+      if (!instanceUrl || !jobId) return;
+      
+      try {
+        const response = await fetch(`${instanceUrl}/api/v1/jobs/${jobId}`, {
+          signal: AbortSignal.timeout(5000)
+        });
+        
+        if (response.status === 404) {
+          updateStatus(`Job ${jobId} not found (completed)`);
+          
+          // If we have stats for this job, mark it as complete
+          if (jobStats[jobId]) {
+            updateJobStatus(jobId, 'complete');
+          }
+          
+          return;
+        }
+        
+        if (!response.ok) {
+          throw new Error(`HTTP error: ${response.status}`);
+        }
+        
+        const job = await response.json();
+        
+        // Update job status and stats
+        updateJobStatus(jobId, job.status);
+        
+        // Add job stats if available
+        if (job.stats) {
+          jobStats[jobId] = {...jobStats[jobId], ...job.stats};
+        }
+        
+        // Add log message about status change
+        if (job.status === 'stopping') {
+          addToJobLog(jobId, `\n⚠️ SERVER REPORTED JOB IS STOPPING\n`);
+        } else if (job.status === 'complete') {
+          addToJobLog(jobId, `\n✅ SERVER REPORTED JOB IS COMPLETE\n`);
+        } else if (job.status === 'error') {
+          addToJobLog(jobId, `\n❌ SERVER REPORTED JOB ERROR\n`);
+        }
+        
+        renderLogCards();
+        
+        // Refresh jobs for this instance
+        fetchJobs(instanceUrl);
+      } catch (error) {
+        updateStatus(`Error fetching job status from ${instanceUrl}: ${error.message}`);
+      }
+    }
+
+    // Stop a specific job with improved handling of the stopping state
+    async function stopJob(instanceUrl, jobId) {
+      if (!instanceUrl || !jobId) return;
+      
+      try {
+        // Update UI immediately to show stopping state
+        updateJobStatus(jobId, 'stopping');
+        addToJobLog(jobId, `\n⚠️ SENDING STOP SIGNAL TO JOB...\n`);
+        renderLogCards();
+        
+        updateStatus(`Stopping job ${jobId} on ${instanceUrl}...`);
+        
+        const response = await fetch(`${instanceUrl}/api/v1/jobs/${jobId}`, {
+          method: 'DELETE',
+          signal: AbortSignal.timeout(5000)
+        });
+        
+        if (!response.ok) {
+          throw new Error(`HTTP error: ${response.status}`);
+        }
+        
+        const data = await response.json();
+        updateStatus(`Job ${jobId} status: ${data.status}`);
+        
+        // Add to job logs
+        addToJobLog(jobId, `\n⚠️ Stop signal sent. Server response: ${data.status}\n`);
+        addToJobLog(jobId, `⚠️ Waiting for SERVICE STOPPING confirmation...\n`);
+        renderLogCards();
+        
+        // Refresh job list
+        fetchJobs(instanceUrl);
+      } catch (error) {
+        updateStatus(`Error stopping job on ${instanceUrl}: ${error.message}`);
+        addToJobLog(jobId, `\nError stopping job: ${error.message}\n`);
+        renderLogCards();
+      }
+    }
+
+    // Render batch results
+    function renderBatchResults() {
+      if (batchResults.length === 0) {
+        batchResultsEl.innerHTML = '<div class="empty-state">No batch tests run yet</div>';
+        return;
+      }
+      
+      let html = '<div class="batch-results">';
+      html += `<div><strong>Target:</strong> ${targetUrlEl.value}</div>`;
+      html += `<div><strong>Settings:</strong> Concurrency=${concurrencyEl.value}, Timeout=${timeoutSecEl.value}s, Wait=${waitMsEl.value}ms, RandomHeaders=${randomHeadersEl.checked}</div>`;
+      html += `<div><strong>Status:</strong> ${batchResults.filter(r => r.success).length}/${batchResults.length} instances started successfully</div>`;
+      html += '</div>';
+      
+      html += '<table style="width:100%; border-collapse: collapse; margin-top: 10px;">';
+      html += '<tr style="background-color: #eee;"><th style="text-align: left; padding: 5px; border-bottom: 1px solid #000;">Instance</th><th style="text-align: left; padding: 5px; border-bottom: 1px solid #000;">Status</th><th style="text-align: left; padding: 5px; border-bottom: 1px solid #000;">Details</th><th style="text-align: left; padding: 5px; border-bottom: 1px solid #000;">Actions</th></tr>';
+      
+      batchResults.forEach((result, index) => {
+        html += `<tr style="border-bottom: 1px solid #eee;">`;
+        html += `<td style="padding: 5px;">${result.instanceUrl}</td>`;
+        html += `<td style="padding: 5px;">${result.success ? '✅ Success' : '❌ Failed'}</td>`;
+        html += `<td style="padding: 5px;">${result.success ? `Job ID: ${result.jobId}` : `Error: ${result.error}`}</td>`;
+        html += `<td style="padding: 5px;">`;
+        
+        if (result.success) {
+          html += `<button onclick="viewJob('${result.instanceUrl}', '${result.jobId}')">View Logs</button>`;
+          html += `<button onclick="stopJob('${result.instanceUrl}', '${result.jobId}')">Stop</button>`;
+        } else {
+          html += `<button onclick="retryJob(${index})">Retry</button>`;
+        }
+        
+        html += `</td>`;
+        html += `</tr>`;
+      });
+      
+      html += '</table>';
+      
+      batchResultsEl.innerHTML = html;
+      
+      // Define global functions for the onclick handlers
+      window.viewJob = (instanceUrl, jobId) => {
+        // Switch to logs tab
+        switchTab('logs');
+        
+        // Connect to WebSocket for this job if not already connected
+        if (!activeSockets[jobId] || activeSockets[jobId].readyState !== WebSocket.OPEN) {
+          const wsUrl = `/api/v1/ws/${jobId}`;
+          connectToWebSocket(instanceUrl, wsUrl, jobId);
+        }
+        
+        updateStatus(`Viewing job ${jobId} on ${instanceUrl}`);
+      };
+      
+      window.stopJob = async (instanceUrl, jobId) => {
+        await stopJob(instanceUrl, jobId);
+      };
+      
+      window.retryJob = async (index) => {
+        const instanceUrl = batchResults[index].instanceUrl;
+        
+        try {
+          updateStatus(`Retrying test on ${instanceUrl}...`);
+          
+          // Check if instance is online first
+          const isOnline = await checkInstanceStatus(instanceUrl);
+          if (!isOnline) {
+            updateStatus(`Cannot retry - Instance ${instanceUrl} is offline`);
+            return;
+          }
+          
+          const data = await startTest(instanceUrl);
+          
+          if (data) {
+            // Update batch result
+            batchResults[index] = {
+              instanceUrl,
+              success: true,
+              jobId: data.id,
+              wsUrl: data.wsUrl
+            };
+            
+            renderBatchResults();
+          }
+        } catch (error) {
+          updateStatus(`Error retrying test: ${error.message}`);
+        }
+      };
+    }
+
+    // Update status
+    function updateStatus(message) {
+      statusBarEl.textContent = message;
+      console.log(message);
+    }
+
+    // Tabs functionality
+    tabs.forEach(tab => {
+      tab.addEventListener('click', () => {
+        const tabName = tab.dataset.tab;
+        switchTab(tabName);
+      });
+    });
+
+    function switchTab(tabName) {
+      // Update tab buttons
+      tabs.forEach(tab => {
+        if (tab.dataset.tab === tabName) {
+          tab.classList.add('active');
+        } else {
+          tab.classList.remove('active');
+        }
+      });
+      
+      // Update tab content visibility
+      tabContents.forEach(content => {
+        if (content.id === `${tabName}Tab`) {
+          content.style.display = 'block';
+        } else {
+          content.style.display = 'none';
+        }
+      });
+    }
+
+    // Setup periodic refresh for various data
+    function setupPeriodicRefresh() {
+      // Clear existing intervals if any
+      if (jobRefreshInterval) {
+        clearInterval(jobRefreshInterval);
+      }
+      
+      // Refresh jobs for online instances every 10 seconds
+      jobRefreshInterval = setInterval(() => {
+        // Get a list of all unique online instance URLs
+        const onlineInstances = instances.filter(i => i.status === 'online');
+        
+        if (onlineInstances.length > 0) {
+          // Only refresh the first instance to avoid too many requests
+          fetchJobs(onlineInstances[0].url);
+        }
+      }, 10000);
+    }
+
+    // Initialize
+    document.addEventListener('DOMContentLoaded', () => {
+      // Load saved instances
+      loadInstances();
+      
+      // Setup refresh interval
+      setupPeriodicRefresh();
+      
+      // Select the first instance if available
+      if (instances.length > 0) {
+        selectInstance(0);
+      } else {
+        updateStatus('Please add an instance to get started');
+      }
+    });
+  </script>
+  <script src="/modals.js"></script>
+</body>
+</html>
