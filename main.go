@@ -15,7 +15,7 @@ import (
 	"strings"
 )
 
-//go:embed index.html README-ASS.md modals.js
+//go:embed index.html README-ASS.md modals.js loader.js
 var content embed.FS
 
 const assetsDir = "enidu-assets"
@@ -58,6 +58,16 @@ func extractHTMLIfNeeded() error {
         }
         // If modals.js is not embedded, just skip (do not error)
     }
+
+	LoaderPath := filepath.Join(assetsDir, "loader.js")
+    if _, err := os.Stat(LoaderPath); os.IsNotExist(err) {
+        data, err := content.ReadFile("loader.js")
+        if err == nil {
+            _ = os.WriteFile(LoaderPath, data, 0644)
+        }
+        // If loader.js is not embedded, just skip (do not error)
+    }
+
     return nil
 }
 

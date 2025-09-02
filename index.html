@@ -881,6 +881,9 @@
       
       updateStatus('Stopping all tests on all instances...');
       
+      // Send WebSocket stop commands to all active jobs
+      sendStopAllCommand();
+      
       const stopPromises = instances.map(async (instance) => {
         try {
           const response = await fetch(`${instance.url}/api/v1/jobs`, {
@@ -967,6 +970,41 @@
       updateStatus('All logs cleared');
     });
 
+    // Send stop command via WebSocket to a specific job
+    function sendStopCommand(jobId, target) {
+      const socket = activeSockets[jobId];
+      if (!socket || socket.readyState !== WebSocket.OPEN) {
+        updateStatus(`Cannot send stop command - WebSocket for job ${jobId} is not connected`);
+        return false;
+      }
+      
+      const message = JSON.stringify({
+        action: "stop",
+        target: target
+      });
+      socket.send(message);
+      updateStatus(`Sent stop command via WebSocket to job ${jobId} for target: ${target}`);
+      return true;
+    }
+    
+    // Send stop command to all active jobs
+    function sendStopAllCommand() {
+      let sentCount = 0;
+      Object.keys(activeSockets).forEach(jobId => {
+        const socket = activeSockets[jobId];
+        if (socket && socket.readyState === WebSocket.OPEN) {
+          const message = JSON.stringify({
+            action: "stop",
+            target: "all"
+          });
+          socket.send(message);
+          sentCount++;
+        }
+      });
+      updateStatus(`Sent stop command to ${sentCount} active job WebSockets`);
+      return sentCount;
+    }
+    
     // Connect to WebSocket with improved handling of SERVICE STOPPING messages
     function connectToWebSocket(instanceUrl, wsUrl, jobId) {
       // Close existing socket for this job if any
@@ -1016,55 +1054,70 @@
       
       socket.onmessage = (event) => {
         try {
-          const message = JSON.parse(event.data);
+          // Parse outer JSON wrapper
+          const outerMessage = JSON.parse(event.data);
           
-          // Handle different message types
-          if (message.type === 'status') {
-            // Explicit status message
-            updateJobStatus(jobId, message.data);
-            addToJobLog(jobId, `\n⚠️ JOB STATUS CHANGED: ${message.data}\n`);
-          } 
-          else if (message.type === 'info') {
-            // Store job info in stats
-            jobStats[jobId] = { 
-              ...jobStats[jobId], 
-              ...message.data,
-              lastUpdated: new Date()
-            };
-            addToJobLog(jobId, `Job Info: ${JSON.stringify(message.data, null, 2)}\n`);
-          } 
-          else if (message.type === 'log') {
-            // Check for SERVICE STOPPING in log message
-            if (typeof message.data === 'string' && message.data.includes('SERVICE STOPPING')) {
-              updateJobStatus(jobId, 'stopping');
-              addToJobLog(jobId, `\n⚠️ ${message.data}\n`);
+          // Check if it's a wrapped message with 'data' field
+          if (outerMessage.data && typeof outerMessage.data === 'string') {
+            try {
+              // Parse inner JSON from 'data' field
+              const innerMessage = JSON.parse(outerMessage.data);
+              
+              // Handle based on inner event
+              if (innerMessage.event === 'update') {
+                // General updates (logs, stats, etc.)
+                if (innerMessage.message) {
+                  // Log message
+                  addToJobLog(jobId, innerMessage.message + '\n');
+                } else if (innerMessage.sent !== undefined) {
+                  // Stats update (e.g., {"event": "update", "sent": 150, "success": 0, ...})
+                  updateJobStats(jobId, {
+                    sent: innerMessage.sent,
+                    success: innerMessage.success,
+                    errors: innerMessage.errors,
+                    timeouts: innerMessage.timeouts,
+                    connErrors: innerMessage.conn_errors,
+                    rps: innerMessage.sent_per_sec || 0  // Assuming RPS is sent as sent_per_sec
+                  });
+                  addToJobLog(jobId, `Stats: Sent=${innerMessage.sent}, Success=${innerMessage.success}, Errors=${innerMessage.errors}, Timeouts=${innerMessage.timeouts}, ConnErrors=${innerMessage.conn_errors}, RPS=${innerMessage.sent_per_sec || 0}\n`);
+                }
+              } else if (innerMessage.event === 'action') {
+                // Action messages (e.g., stopping/shutdown)
+                if (innerMessage.message && innerMessage.message.includes('Stopping server.... initiating Shutdown...')) {
+                  // Set to 'complete' for proper shutdown handling
+                  updateJobStatus(jobId, 'complete');
+                  addToJobLog(jobId, `\n✅ ${innerMessage.message} - Job completed\n`);
+                } else if (innerMessage.message && innerMessage.message.includes('Stopping')) {
+                  updateJobStatus(jobId, 'stopping');
+                  addToJobLog(jobId, `\n⚠️ ${innerMessage.message}\n`);
+                } else {
+                  addToJobLog(jobId, `\n⚠️ ${innerMessage.message}\n`);
+                }
+              } else {
+                // Fallback for unrecognized inner events
+                addToJobLog(jobId, `Unknown inner event: ${JSON.stringify(innerMessage)}\n`);
+              }
+            } catch (innerError) {
+              // If inner parsing fails, treat as raw log
+              addToJobLog(jobId, `Failed to parse inner data: ${outerMessage.data}\n`);
+            }
+          } else if (outerMessage.type === 'control') {
+            // Handle control messages (e.g., panic stop)
+            if (outerMessage.data && outerMessage.data.includes('Panic Stop')) {
+              updateJobStatus(jobId, 'error');  // Or 'complete' if you prefer
+              addToJobLog(jobId, `\n🛑 ${outerMessage.data}\n`);
             } else {
-              addToJobLog(jobId, `${message.data}`);
+              addToJobLog(jobId, `\n⚠️ Control: ${outerMessage.data}\n`);
             }
-            
-            // Try to parse stats from log line
-            if (typeof message.data === 'string') {
-              parseStatsFromLog(jobId, message.data);
-            }
-          } 
-          else if (message.log) {
-            // Legacy format - Check for SERVICE STOPPING in log
-            if (message.log.includes('SERVICE STOPPING')) {
-              updateJobStatus(jobId, 'stopping');
-              addToJobLog(jobId, `\n⚠️ ${message.log}\n`);
-            } else {
-              addToJobLog(jobId, `${message.log}\n`);
-            }
-            
-            parseStatsFromLog(jobId, message.log);
+          } else {
+            // Fallback for unrecognized outer structure
+            addToJobLog(jobId, `Unknown outer message: ${JSON.stringify(outerMessage)}\n`);
           }
           
           renderLogCards();
         } catch (error) {
-          // Handle non-JSON messages
+          // Handle non-JSON messages (fallback for backward compatibility)
           console.error('Error parsing WebSocket message:', error);
-          
-          // Check if the raw message contains SERVICE STOPPING
           if (typeof event.data === 'string') {
             if (event.data.includes('SERVICE STOPPING')) {
               updateJobStatus(jobId, 'stopping');
@@ -1075,8 +1128,6 @@
           } else {
             addToJobLog(jobId, 'Received non-text message\n');
           }
-          
-          renderLogCards();
         }
       };
       
@@ -1139,6 +1190,15 @@
       }
     }
     
+    // Update job stats from WebSocket message
+    function updateJobStats(jobId, stats) {
+      if (!jobStats[jobId]) {
+        jobStats[jobId] = {};
+      }
+      Object.assign(jobStats[jobId], stats);
+      jobStats[jobId].lastUpdated = new Date();
+    }
+
     // Parse stats from log line
     function parseStatsFromLog(jobId, logLine) {
       // Simple regex to extract stats from a typical load test output line
@@ -1500,6 +1560,9 @@
       if (!instanceUrl || !jobId) return;
       
       try {
+        // Send WebSocket stop command first
+        sendStopCommand(jobId, jobId);
+        
         // Update UI immediately to show stopping state
         updateJobStatus(jobId, 'stopping');
         addToJobLog(jobId, `\n⚠️ SENDING STOP SIGNAL TO JOB...\n`);
@@ -1654,6 +1717,7 @@
         }
       });
     }
+    
 
     // Setup periodic refresh for various data
     function setupPeriodicRefresh() {
@@ -1689,7 +1753,11 @@
         updateStatus('Please add an instance to get started');
       }
     });
+
+    
   </script>
   <script src="/modals.js"></script>
+  <script src="/loader.js"></script>
+   <script src="https://cdnjs.cloudflare.com/ajax/libs/animejs/3.2.1/anime.min.js"></script>
 </body>
 </html>

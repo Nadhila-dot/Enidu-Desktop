@@ -1,6 +1,6 @@
 (function () {
-  // Only run after DOM is ready
-  document.addEventListener('DOMContentLoaded', function () {
+  // Wait for preloader to be done, then check for modal trigger
+  document.addEventListener('preloaderDone', function () {
     const params = new URLSearchParams(window.location.search);
     if (params.get('createdAssets') === 'true') {
       showAssetsCreatedModal();
